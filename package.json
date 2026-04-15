@@ -1,0 +1,24 @@
+{
+  "name": "barops-authority",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo for BarOps Authority SaaS demo by Ishakti Labs.",
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "cd apps/api && gradle bootRun",
+    "dev:web": "npm run dev --workspace @barops/web",
+    "build:web": "npm run build --workspace @barops/web",
+    "lint:web": "npm run lint --workspace @barops/web",
+    "build:packages": "npm run build --workspace @barops/shared-types && npm run build --workspace @barops/rules-engine && npm run build --workspace @barops/demo-data && npm run build --workspace @barops/report-templates",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}

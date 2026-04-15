@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: barops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: barops
+      POSTGRES_USER: barops
+      POSTGRES_PASSWORD: barops_demo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+volumes:
+  postgres-data:
