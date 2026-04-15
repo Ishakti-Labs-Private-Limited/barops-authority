@@ -8,8 +8,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "cd apps/api && gradle bootRun",
-    "dev:web": "npm run dev --workspace @barops/web",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "dev:api": "gradle -p apps/api bootRun",
+    "dev:web": "npm run build:packages && npm run dev --workspace @barops/web",
+    "dev": "npm run dev:web",
     "build:web": "npm run build --workspace @barops/web",
     "lint:web": "npm run lint --workspace @barops/web",
     "build:packages": "npm run build --workspace @barops/shared-types && npm run build --workspace @barops/rules-engine && npm run build --workspace @barops/demo-data && npm run build --workspace @barops/report-templates",

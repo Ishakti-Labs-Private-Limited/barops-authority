@@ -1,12 +1,33 @@
 import { demoOutletSignals } from "@barops/demo-data";
 import { evaluateAttentionList } from "@barops/rules-engine";
+import type { OutletAttention } from "@barops/shared-types";
 import { AttentionTable } from "@/components/dashboard/attention-table";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 
-export default function DashboardPage(): JSX.Element {
-  const attentionRows = evaluateAttentionList(demoOutletSignals).sort(
-    (left, right) => right.riskScore - left.riskScore
-  );
+const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
+
+async function getAttentionRows(): Promise<OutletAttention[]> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+
+  try {
+    const response = await fetch(`${baseUrl}/attention`, {
+      next: { revalidate: 30 }
+    });
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const payload = (await response.json()) as OutletAttention[];
+    return payload.sort((left, right) => right.riskScore - left.riskScore);
+  } catch {
+    return evaluateAttentionList(demoOutletSignals).sort(
+      (left, right) => right.riskScore - left.riskScore
+    );
+  }
+}
+
+export default async function DashboardPage(): Promise<JSX.Element> {
+  const attentionRows = await getAttentionRows();
 
   const highRiskCount = attentionRows.filter((row) => row.riskScore >= 75).length;
   const mediumRiskCount = attentionRows.filter(

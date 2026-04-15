@@ -42,20 +42,16 @@ This monorepo is intentionally **demo-first** with clean starter architecture an
    - PowerShell:
      - `Copy-Item .env.example .env`
      - `Copy-Item apps/web/.env.example apps/web/.env.local`
-     - `Copy-Item apps/api/.env.example apps/api/.env`
    - macOS/Linux:
      - `cp .env.example .env`
      - `cp apps/web/.env.example apps/web/.env.local`
-     - `cp apps/api/.env.example apps/api/.env`
 2. Start PostgreSQL:
-   - `docker compose up -d`
+   - `npm run db:up`
 3. Install JS dependencies:
    - `npm install`
-4. Build local shared packages:
-   - `npm run build:packages`
-5. Start the API (from `apps/api`):
-   - `gradle bootRun`
-6. Start the web app (from repo root):
+4. Start the API (from repo root):
+   - `npm run dev:api`
+5. Start the web app (from repo root):
    - `npm run dev:web`
 
 Web: `http://localhost:3000`  
@@ -72,6 +68,7 @@ API attention endpoint: `http://localhost:8080/api/v1/attention`
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+- `CORS_ALLOWED_ORIGINS`
 - `NEXT_PUBLIC_API_BASE_URL`
 
 ### Web (`apps/web/.env.example`)
@@ -82,6 +79,18 @@ API attention endpoint: `http://localhost:8080/api/v1/attention`
 
 - `API_PORT` - Spring Boot port
 - `POSTGRES_*` - PostgreSQL connection settings
+- `CORS_ALLOWED_ORIGINS` - comma-separated allowed origins for browser clients
+
+> Spring Boot does not auto-load `apps/api/.env`. Use shell environment variables, defaults in
+> `application.yml`, or pass variables from your process manager.
+
+## Useful Scripts
+
+- `npm run db:up` / `npm run db:down` - start/stop local PostgreSQL
+- `npm run db:logs` - follow PostgreSQL logs
+- `npm run dev:api` - run Spring Boot API
+- `npm run dev:web` - build local packages and run Next.js
+- `npm run build:packages` - rebuild workspace packages (`packages/*`)
 
 ## Demo-First Architecture Notes
 
@@ -89,6 +98,7 @@ API attention endpoint: `http://localhost:8080/api/v1/attention`
 - Risk scoring logic starts in `packages/rules-engine`.
 - Synthetic signals live in `packages/demo-data`.
 - Both web and API use the same domain language (`packages/shared-types` / mirrored Java records).
+- Dashboard prefers API data from `NEXT_PUBLIC_API_BASE_URL` and falls back to local demo signals.
 - PostgreSQL is wired for incremental persistence when demo needs evolve.
 
 ## Next Suggested Steps
