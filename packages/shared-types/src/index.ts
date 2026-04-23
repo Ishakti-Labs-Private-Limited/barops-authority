@@ -5,6 +5,16 @@ export type UploadType = "DAILY_SALES" | "DAILY_STOCK" | "MANUAL_CORRECTION";
 export type UploadStatus = "RECEIVED" | "PROCESSED" | "FAILED" | "CORRECTED";
 export type AnomalySeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type AnomalyStatus = "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "FALSE_POSITIVE";
+export type RuleCode =
+  | "STOCK_MISMATCH"
+  | "OWN_BASELINE_DEVIATION"
+  | "PEER_GROUP_DEVIATION"
+  | "REPEATED_LATE_UPLOADS"
+  | "MISSING_DAILY_UPLOAD"
+  | "SUSPICIOUS_CORRECTION_PATTERN"
+  | "PREMIUM_MIX_SPIKE"
+  | "TOP_BRAND_SHARP_DROP"
+  | "RISK_ACCUMULATION";
 
 export type OutletSignal = {
   outletId: string;
@@ -14,10 +24,49 @@ export type OutletSignal = {
   state: string;
   source: SignalSource;
   date: string;
-  cashVariancePercent: number;
-  lateOpeningCount7d: number;
-  stockVariancePercent: number;
-  managerOverrideCount7d: number;
+  uploadId?: string | null;
+  peerGroupId?: string | null;
+  productId?: string | null;
+  stockVariancePercent?: number;
+  ownBaselineDeviationPercent?: number;
+  peerDeviationPercent?: number;
+  lateUploads7d?: number;
+  missingUploadToday?: boolean;
+  correctionCount7d?: number;
+  correctionCount30d?: number;
+  correctionChainLength?: number;
+  premiumMixPercent?: number;
+  premiumMixBaselinePercent?: number;
+  topBrandDropPercent?: number;
+  topBrandUnitsToday?: number;
+  topBrandUnitsBaseline?: number;
+  riskScore7dAverage?: number;
+  unresolvedAnomalyCount?: number;
+  highRiskDaysStreak?: number;
+};
+
+export type RuleEvaluation = {
+  ruleCode: RuleCode;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  riskScoreDelta: number;
+  explanation: string;
+  managementExplanation: string;
+  financialImpactEstimate: number | null;
+  confidenceScore: number;
+};
+
+export type AnomalyCandidate = {
+  outletId: string;
+  productId: string | null;
+  anomalyDate: string;
+  ruleCode: RuleCode;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  riskScoreDelta: number;
+  summary: string;
+  details: Record<string, unknown>;
+  detectedFromUploadId: string | null;
 };
 
 export type OutletAttention = {
@@ -26,7 +75,10 @@ export type OutletAttention = {
   city: string;
   state: string;
   riskScore: number;
+  attentionBand: "GREEN" | "AMBER" | "RED";
   reasons: string[];
+  managementSummary: string;
+  triggeredRules: RuleEvaluation[];
 };
 
 export type Outlet = {
