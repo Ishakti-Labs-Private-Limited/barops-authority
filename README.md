@@ -47,6 +47,7 @@ This monorepo is intentionally **demo-first** with clean starter architecture an
      - `cp apps/web/.env.example apps/web/.env.local`
 2. Start PostgreSQL:
    - `npm run db:up`
+   - First boot auto-runs SQL files in `infra/postgres/` (`001__barops_schema.sql`, `002__barops_seed_demo.sql`)
 3. Install JS dependencies:
    - `npm install`
 4. Start the API (from repo root):
@@ -91,6 +92,14 @@ API attention endpoint: `http://localhost:8080/api/v1/attention`
 - `npm run dev:api` - run Spring Boot API
 - `npm run dev:web` - build local packages and run Next.js
 - `npm run build:packages` - rebuild workspace packages (`packages/*`)
+- `npm run generate:sql --workspace @barops/demo-data` - generate realistic synthetic SQL seed (`infra/postgres/003__barops_seed_synthetic.sql`)
+
+### Database Notes
+
+- SQL schema and demo seed live in `infra/postgres/`.
+- If you need to re-apply from scratch, reset the compose volume:
+  - `docker compose down -v`
+  - `npm run db:up`
 
 ## Demo-First Architecture Notes
 
