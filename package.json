@@ -11,7 +11,7 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
-    "dev:api": "dotenv -e apps/api/.env -- gradle -p apps/api bootRun",
+    "dev:api": "dotenv -e apps/api/.env -o -- gradle -p apps/api bootRun",
     "dev:web": "npm run build:packages && npm run dev --workspace @barops/web",
     "dev": "npm run dev:web",
     "build:web": "npm run build --workspace @barops/web",
