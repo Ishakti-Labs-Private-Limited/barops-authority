@@ -45,7 +45,10 @@ public class AttentionService {
         int salesDropPercent = computeDropPercent(avgPrev7Revenue, latestRevenue);
         int historicalRisk = nullSafe(row.avgRiskScore7d()).setScale(0, RoundingMode.HALF_UP).intValue();
 
-        if (stockVariance.compareTo(BigDecimal.valueOf(7)) >= 0) {
+        if (stockVariance.compareTo(BigDecimal.valueOf(12)) >= 0) {
+            score += 30;
+            reasons.add("Expected vs reported stock variance is %.1f%%".formatted(stockVariance.doubleValue()));
+        } else if (stockVariance.compareTo(BigDecimal.valueOf(7)) >= 0) {
             score += 20;
             reasons.add("Expected vs reported stock variance is %.1f%%".formatted(stockVariance.doubleValue()));
         } else if (stockVariance.compareTo(BigDecimal.valueOf(3)) >= 0) {
@@ -75,6 +78,9 @@ public class AttentionService {
         }
 
         if (row.anomalyCountToday() >= 5) {
+            score += 24;
+            reasons.add("%d open anomalies detected today".formatted(row.anomalyCountToday()));
+        } else if (row.anomalyCountToday() >= 3) {
             score += 16;
             reasons.add("%d open anomalies detected today".formatted(row.anomalyCountToday()));
         } else if (row.anomalyCountToday() >= 2) {
@@ -82,7 +88,13 @@ public class AttentionService {
             reasons.add("%d open anomalies detected today".formatted(row.anomalyCountToday()));
         }
 
-        if (row.unresolvedCount30d() >= 6) {
+        if (row.unresolvedCount30d() >= 40) {
+            score += 24;
+            reasons.add("%d unresolved anomalies in the last 30 days".formatted(row.unresolvedCount30d()));
+        } else if (row.unresolvedCount30d() >= 20) {
+            score += 16;
+            reasons.add("%d unresolved anomalies in the last 30 days".formatted(row.unresolvedCount30d()));
+        } else if (row.unresolvedCount30d() >= 6) {
             score += 14;
             reasons.add("%d unresolved anomalies in the last 30 days".formatted(row.unresolvedCount30d()));
         } else if (row.unresolvedCount30d() >= 3) {
@@ -90,7 +102,10 @@ public class AttentionService {
             reasons.add("%d unresolved anomalies in the last 30 days".formatted(row.unresolvedCount30d()));
         }
 
-        if (historicalRisk >= 70) {
+        if (historicalRisk >= 80) {
+            score += 24;
+            reasons.add("Risk has remained critically elevated over the past week");
+        } else if (historicalRisk >= 70) {
             score += 16;
             reasons.add("Risk has remained elevated over the past week");
         } else if (historicalRisk >= 45) {

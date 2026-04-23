@@ -321,6 +321,8 @@ def generate(output_path: Path, seed: int = SEED):
     outlet_day_premium_units: Dict[Tuple[str, dt.date], int] = defaultdict(int)
     outlet_day_total_units: Dict[Tuple[str, dt.date], int] = defaultdict(int)
     outlet_day_top_brand: Dict[Tuple[str, dt.date], Tuple[str, int]] = {}
+    outlet_day_sales_upload_id: Dict[Tuple[str, dt.date], str] = {}
+    outlet_day_stock_upload_id: Dict[Tuple[str, dt.date], str] = {}
     accumulated_risk: Dict[str, int] = defaultdict(int)
     repeated_late_counter: Dict[str, int] = defaultdict(int)
     correction_streak: Dict[str, int] = defaultdict(int)
@@ -449,6 +451,7 @@ def generate(output_path: Path, seed: int = SEED):
                 "created_at": sales_upload_created,
             }
             uploads.append(sales_upload_row)
+            outlet_day_sales_upload_id[(outlet.id, day)] = sales_upload_id
 
             stock_status = "CORRECTED" if corrected else "PROCESSED"
             stock_error_count = 1 if corrected else 0
@@ -509,6 +512,7 @@ def generate(output_path: Path, seed: int = SEED):
                 )
             else:
                 correction_streak[outlet.id] = max(0, correction_streak[outlet.id] - 1)
+            outlet_day_stock_upload_id[(outlet.id, day)] = final_stock_upload_id
 
             total_units_sold = 0
             for idx, p in enumerate(selected):
@@ -638,6 +642,7 @@ def generate(output_path: Path, seed: int = SEED):
 
             if correction_streak[outlet.id] >= 3:
                 anomaly_id = uid("anomaly", f"{outlet.id}:{day}:corr_chain")
+                latest_stock_upload_id = outlet_day_stock_upload_id.get((outlet.id, day))
                 anomalies.append(
                     {
                         "id": anomaly_id,
@@ -651,10 +656,10 @@ def generate(output_path: Path, seed: int = SEED):
                         "summary": "Frequent correction chain suggests possible stock manipulation.",
                         "details": {
                             "consecutiveCorrectionDays": correction_streak[outlet.id],
-                            "latestCorrectionUploadId": correction_upload_id,
+                            "latestCorrectionUploadId": latest_stock_upload_id,
                             "outletCode": outlet.outlet_code,
                         },
-                        "detected_from_upload_id": correction_upload_id,
+                        "detected_from_upload_id": latest_stock_upload_id,
                     }
                 )
                 accumulated_risk[outlet.id] += 28
@@ -689,7 +694,7 @@ def generate(output_path: Path, seed: int = SEED):
                                 "deviationPercent": round(((units - baseline) / baseline) * 100, 2),
                                 "outletCode": outlet.outlet_code,
                             },
-                            "detected_from_upload_id": uid("upload", f"{outlet.id}:{day}:sales:base"),
+                            "detected_from_upload_id": outlet_day_sales_upload_id.get((outlet.id, day)),
                         }
                     )
                     accumulated_risk[outlet.id] += delta
@@ -716,7 +721,7 @@ def generate(output_path: Path, seed: int = SEED):
                                 "deviationPercent": round(((units - peer_avg) / peer_avg) * 100, 2),
                                 "peerGroupId": outlet.peer_group_id,
                             },
-                            "detected_from_upload_id": uid("upload", f"{outlet.id}:{day}:sales:base"),
+                            "detected_from_upload_id": outlet_day_sales_upload_id.get((outlet.id, day)),
                         }
                     )
                     accumulated_risk[outlet.id] += 11
@@ -744,7 +749,7 @@ def generate(output_path: Path, seed: int = SEED):
                                 "premiumMix": round(premium_mix, 3),
                                 "expectedMix": expected_mix,
                             },
-                            "detected_from_upload_id": uid("upload", f"{outlet.id}:{day}:sales:base"),
+                            "detected_from_upload_id": outlet_day_sales_upload_id.get((outlet.id, day)),
                         }
                     )
                     accumulated_risk[outlet.id] += anomalies[-1]["risk_score_delta"]
@@ -771,7 +776,7 @@ def generate(output_path: Path, seed: int = SEED):
                                 "units7dAgo": prev_units,
                                 "dropPercent": round(((prev_units - current_units) / prev_units) * 100, 2),
                             },
-                            "detected_from_upload_id": uid("upload", f"{outlet.id}:{day}:sales:base"),
+                            "detected_from_upload_id": outlet_day_sales_upload_id.get((outlet.id, day)),
                         }
                     )
                     accumulated_risk[outlet.id] += 21

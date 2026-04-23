@@ -15,15 +15,7 @@ import java.util.Optional;
 public class AttentionRepository {
 
     private static final String BASE_QUERY = """
-            WITH latest_business_date AS (
-              SELECT GREATEST(
-                COALESCE((SELECT MAX(stock_date) FROM daily_stock), DATE '1970-01-01'),
-                COALESCE((SELECT MAX(sales_date) FROM daily_sales), DATE '1970-01-01'),
-                COALESCE((SELECT MAX(upload_date) FROM uploads), DATE '1970-01-01'),
-                COALESCE((SELECT MAX(anomaly_date) FROM anomalies), DATE '1970-01-01')
-              ) AS business_date
-            ),
-            blr_outlets AS (
+            WITH blr_outlets AS (
               SELECT o.id,
                      o.outlet_name,
                      o.license_type,
@@ -35,6 +27,42 @@ public class AttentionRepository {
               WHERE o.is_active = TRUE
                 AND o.city = :city
                 AND o.state = :state
+            ),
+            outlet_scope AS (
+              SELECT COUNT(*) AS outlet_count FROM blr_outlets
+            ),
+            candidate_dates AS (
+              SELECT metric_date,
+                     COUNT(DISTINCT outlet_id) AS covered_outlets
+              FROM (
+                SELECT stock_date AS metric_date, outlet_id FROM daily_stock
+                UNION ALL
+                SELECT sales_date AS metric_date, outlet_id FROM daily_sales
+                UNION ALL
+                SELECT upload_date AS metric_date, outlet_id FROM uploads
+              ) d
+              JOIN blr_outlets bo ON bo.id = d.outlet_id
+              GROUP BY metric_date
+            ),
+            latest_business_date AS (
+              SELECT COALESCE(
+                (
+                  SELECT cd.metric_date
+                  FROM candidate_dates cd
+                  CROSS JOIN outlet_scope os
+                  WHERE cd.covered_outlets >= GREATEST(1, (os.outlet_count * 8) / 10)
+                  ORDER BY cd.metric_date DESC, cd.covered_outlets DESC
+                  LIMIT 1
+                ),
+                (
+                  SELECT GREATEST(
+                    COALESCE((SELECT MAX(stock_date) FROM daily_stock), DATE '1970-01-01'),
+                    COALESCE((SELECT MAX(sales_date) FROM daily_sales), DATE '1970-01-01'),
+                    COALESCE((SELECT MAX(upload_date) FROM uploads), DATE '1970-01-01'),
+                    COALESCE((SELECT MAX(anomaly_date) FROM anomalies), DATE '1970-01-01')
+                  )
+                )
+              ) AS business_date
             ),
             stock_latest AS (
               SELECT ds.outlet_id,
