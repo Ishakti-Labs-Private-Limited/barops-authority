@@ -1,5 +1,6 @@
 import { demoOutletSignals } from "@barops/demo-data";
 import { evaluateAttentionList } from "@barops/rules-engine";
+import Link from "next/link";
 import { AttentionTable, type AttentionBoardRow } from "@/components/dashboard/attention-table";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 
@@ -53,7 +54,15 @@ export default async function DashboardPage(): Promise<JSX.Element> {
   return (
     <main className="mx-auto min-h-screen max-w-7xl space-y-6 px-6 py-10">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Control tower</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">Control tower</h1>
+          <Link
+            href="/dashboard/executive-summary"
+            className="rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
+          >
+            Open executive summary
+          </Link>
+        </div>
         <p className="max-w-3xl text-muted-foreground">
           BarOps Authority sits above POS feeds, Excel imports, and manual uploads. It flags which
           outlet needs central-office action today and explains the why.

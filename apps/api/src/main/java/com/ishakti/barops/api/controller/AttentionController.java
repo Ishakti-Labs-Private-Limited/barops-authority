@@ -1,6 +1,7 @@
 package com.ishakti.barops.api.controller;
 
 import com.ishakti.barops.api.dto.OutletAttentionDto;
+import com.ishakti.barops.api.dto.ExecutiveSummaryDto;
 import com.ishakti.barops.api.service.AttentionService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,5 +41,10 @@ public class AttentionController {
                         NOT_FOUND,
                         "Outlet attention not found for outletId=%s".formatted(outletId)
                 ));
+    }
+
+    @GetMapping("/executive-summary/weekly")
+    public ExecutiveSummaryDto getWeeklyExecutiveSummary() {
+        return attentionService.getWeeklyExecutiveSummary();
     }
 }

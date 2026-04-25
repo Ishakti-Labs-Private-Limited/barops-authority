@@ -1,13 +1,17 @@
 package com.ishakti.barops.api.service;
 
 import com.ishakti.barops.api.dto.OutletAttentionDto;
+import com.ishakti.barops.api.dto.ExecutiveSummaryDto;
 import com.ishakti.barops.api.repository.AttentionRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -33,6 +37,81 @@ public class AttentionService {
     public Optional<OutletAttentionDto> getOutletAttention(String outletId) {
         return attentionRepository.fetchDailyAttentionRowByOutlet(outletId, DEFAULT_CITY, DEFAULT_STATE)
                 .map(this::evaluateRow);
+    }
+
+    public ExecutiveSummaryDto getWeeklyExecutiveSummary() {
+        List<OutletAttentionDto> rows = getDailyAttention();
+        LocalDate latestBusinessDate = rows.stream()
+                .map(row -> LocalDate.parse(row.businessDate()))
+                .max(LocalDate::compareTo)
+                .orElse(LocalDate.now());
+        LocalDate weekStartDate = latestBusinessDate.minusDays(6);
+
+        int redOutlets = (int) rows.stream().filter(row -> "RED".equals(row.attentionBand())).count();
+        int amberOutlets = (int) rows.stream().filter(row -> "AMBER".equals(row.attentionBand())).count();
+        int greenOutlets = (int) rows.stream().filter(row -> "GREEN".equals(row.attentionBand())).count();
+
+        List<ExecutiveSummaryDto.TopRiskOutletDto> topRiskOutlets = rows.stream()
+                .sorted(Comparator.comparingInt(OutletAttentionDto::riskScore).reversed())
+                .limit(5)
+                .map(this::toTopRiskOutlet)
+                .toList();
+
+        Map<String, Integer> repeatedPatternCounts = new LinkedHashMap<>();
+        for (OutletAttentionDto row : rows) {
+            for (String reason : row.reasons()) {
+                repeatedPatternCounts.merge(reason, 1, Integer::sum);
+            }
+        }
+        List<ExecutiveSummaryDto.IssuePatternDto> repeatedIssuePatterns = repeatedPatternCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> new ExecutiveSummaryDto.IssuePatternDto(entry.getKey(), entry.getValue()))
+                .toList();
+
+        Map<String, List<OutletAttentionDto>> byZone = rows.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        OutletAttentionDto::zone,
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.toList()
+                ));
+        List<ExecutiveSummaryDto.ZoneRiskSummaryDto> zoneRiskSummary = byZone.entrySet().stream()
+                .map(entry -> {
+                    List<OutletAttentionDto> zoneRows = entry.getValue();
+                    int avgRisk = (int) Math.round(zoneRows.stream()
+                            .mapToInt(OutletAttentionDto::riskScore)
+                            .average()
+                            .orElse(0));
+                    int red = (int) zoneRows.stream().filter(row -> "RED".equals(row.attentionBand())).count();
+                    int amber = (int) zoneRows.stream().filter(row -> "AMBER".equals(row.attentionBand())).count();
+                    int green = (int) zoneRows.stream().filter(row -> "GREEN".equals(row.attentionBand())).count();
+                    return new ExecutiveSummaryDto.ZoneRiskSummaryDto(entry.getKey(), zoneRows.size(), avgRisk, red, amber, green);
+                })
+                .sorted(Comparator.comparingInt(ExecutiveSummaryDto.ZoneRiskSummaryDto::avgRiskScore).reversed())
+                .toList();
+
+        List<ExecutiveSummaryDto.TopRiskOutletDto> immediateVisitOutlets = rows.stream()
+                .filter(row -> "RED".equals(row.attentionBand()) || row.riskScore() >= 85 || row.anomalyCount() >= 3)
+                .sorted(Comparator.comparingInt(OutletAttentionDto::riskScore).reversed())
+                .limit(3)
+                .map(this::toTopRiskOutlet)
+                .toList();
+
+        List<String> managementRecommendations = buildManagementRecommendations(repeatedIssuePatterns, zoneRiskSummary, immediateVisitOutlets);
+
+        return new ExecutiveSummaryDto(
+                weekStartDate.toString(),
+                latestBusinessDate.toString(),
+                rows.size(),
+                redOutlets,
+                amberOutlets,
+                greenOutlets,
+                topRiskOutlets,
+                repeatedIssuePatterns,
+                zoneRiskSummary,
+                immediateVisitOutlets,
+                managementRecommendations
+        );
     }
 
     private OutletAttentionDto evaluateRow(AttentionRepository.AttentionMetricsRow row) {
@@ -176,5 +255,43 @@ public class AttentionService {
 
     private static BigDecimal nullSafe(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private ExecutiveSummaryDto.TopRiskOutletDto toTopRiskOutlet(OutletAttentionDto row) {
+        return new ExecutiveSummaryDto.TopRiskOutletDto(
+                row.outletId(),
+                row.outletName(),
+                row.zone(),
+                row.locality(),
+                row.riskScore(),
+                row.anomalyCount(),
+                row.reasons()
+        );
+    }
+
+    private static List<String> buildManagementRecommendations(
+            List<ExecutiveSummaryDto.IssuePatternDto> repeatedIssuePatterns,
+            List<ExecutiveSummaryDto.ZoneRiskSummaryDto> zoneRiskSummary,
+            List<ExecutiveSummaryDto.TopRiskOutletDto> immediateVisitOutlets
+    ) {
+        List<String> recommendations = new java.util.ArrayList<>();
+
+        if (!immediateVisitOutlets.isEmpty()) {
+            recommendations.add("Prioritize field visits for " + immediateVisitOutlets.get(0).outletName()
+                    + " and other red-band outlets within 48 hours.");
+        }
+
+        if (!repeatedIssuePatterns.isEmpty()) {
+            recommendations.add("Launch a focused corrective action on '" + repeatedIssuePatterns.get(0).issue()
+                    + "' across affected outlets this week.");
+        }
+
+        if (!zoneRiskSummary.isEmpty()) {
+            recommendations.add("Assign a zone review call for " + zoneRiskSummary.get(0).zone()
+                    + " where average risk is currently the highest.");
+        }
+
+        recommendations.add("Track closure of open anomalies daily and publish a follow-up status note in the next weekly review.");
+        return recommendations.stream().limit(4).toList();
     }
 }
