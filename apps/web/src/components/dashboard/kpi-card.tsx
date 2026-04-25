@@ -3,11 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type KpiCardProps = {
   label: string;
   value: string;
-  tone?: "default" | "danger";
+  tone?: "default" | "danger" | "warning" | "success";
 };
 
 export function KpiCard({ label, value, tone = "default" }: KpiCardProps): JSX.Element {
-  const valueClassName = tone === "danger" ? "text-danger" : "text-foreground";
+  const valueClassName =
+    tone === "danger"
+      ? "text-danger"
+      : tone === "warning"
+        ? "text-amber-600"
+        : tone === "success"
+          ? "text-emerald-600"
+          : "text-foreground";
 
   return (
     <Card>

@@ -1,12 +1,31 @@
 import { demoOutletSignals } from "@barops/demo-data";
 import { evaluateAttentionList } from "@barops/rules-engine";
-import type { OutletAttention } from "@barops/shared-types";
-import { AttentionTable } from "@/components/dashboard/attention-table";
+import { AttentionTable, type AttentionBoardRow } from "@/components/dashboard/attention-table";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 
-async function getAttentionRows(): Promise<OutletAttention[]> {
+function asBoardRowsFromFallback(): AttentionBoardRow[] {
+  return evaluateAttentionList(demoOutletSignals).map((row) => ({
+    outletId: row.outletId,
+    outletName: row.outletName,
+    licenseType: "CL7",
+    zone: "Central",
+    locality: row.city,
+    city: row.city,
+    state: row.state,
+    businessDate: new Date().toISOString().slice(0, 10),
+    riskScore: row.riskScore,
+    attentionBand: row.riskScore >= 75 ? "RED" : row.riskScore >= 45 ? "AMBER" : "GREEN",
+    reasons: row.reasons,
+    managementSummary: row.managementSummary,
+    anomalyCount: row.triggeredRules.length,
+    trendDirection: "STABLE",
+    trendDelta: 0
+  }));
+}
+
+async function getAttentionRows(): Promise<AttentionBoardRow[]> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
   try {
@@ -17,22 +36,19 @@ async function getAttentionRows(): Promise<OutletAttention[]> {
       throw new Error(`API request failed with status ${response.status}`);
     }
 
-    const payload = (await response.json()) as OutletAttention[];
+    const payload = (await response.json()) as AttentionBoardRow[];
     return payload.sort((left, right) => right.riskScore - left.riskScore);
   } catch {
-    return evaluateAttentionList(demoOutletSignals).sort(
-      (left, right) => right.riskScore - left.riskScore
-    );
+    return asBoardRowsFromFallback().sort((left, right) => right.riskScore - left.riskScore);
   }
 }
 
 export default async function DashboardPage(): Promise<JSX.Element> {
   const attentionRows = await getAttentionRows();
-
-  const highRiskCount = attentionRows.filter((row) => row.riskScore >= 75).length;
-  const mediumRiskCount = attentionRows.filter(
-    (row) => row.riskScore >= 45 && row.riskScore < 75
-  ).length;
+  const redCount = attentionRows.filter((row) => row.attentionBand === "RED").length;
+  const amberCount = attentionRows.filter((row) => row.attentionBand === "AMBER").length;
+  const greenCount = attentionRows.filter((row) => row.attentionBand === "GREEN").length;
+  const latestBusinessDate = attentionRows[0]?.businessDate ?? "N/A";
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl space-y-6 px-6 py-10">
@@ -44,10 +60,12 @@ export default async function DashboardPage(): Promise<JSX.Element> {
         </p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-5">
         <KpiCard label="Outlets monitored" value={`${attentionRows.length}`} />
-        <KpiCard label="High risk outlets" value={`${highRiskCount}`} tone="danger" />
-        <KpiCard label="Medium risk outlets" value={`${mediumRiskCount}`} />
+        <KpiCard label="Red outlets" value={`${redCount}`} tone="danger" />
+        <KpiCard label="Amber outlets" value={`${amberCount}`} tone="warning" />
+        <KpiCard label="Green outlets" value={`${greenCount}`} tone="success" />
+        <KpiCard label="Latest business date" value={latestBusinessDate} />
       </section>
 
       <AttentionTable rows={attentionRows} />
