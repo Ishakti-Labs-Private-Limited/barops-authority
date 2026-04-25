@@ -193,7 +193,7 @@ public class AttentionRepository {
     }
 
     public Optional<AttentionMetricsRow> fetchDailyAttentionRowByOutlet(String outletId, String city, String state) {
-        String query = BASE_QUERY + " WHERE o.id = :outletId";
+        String query = BASE_QUERY + " WHERE CAST(o.id AS text) = :outletId";
         List<AttentionMetricsRow> rows = jdbcTemplate.query(query, new MapSqlParameterSource()
                 .addValue("outletId", outletId)
                 .addValue("city", city)

@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -147,7 +148,14 @@ export function AttentionTable({ rows }: AttentionTableProps): JSX.Element {
             {filteredRows.map((row) => (
               <Fragment key={row.outletId}>
                 <TableRow>
-                  <TableCell className="font-medium">{row.outletName}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/dashboard/outlets/${row.outletId}`}
+                      className="text-foreground hover:text-primary hover:underline"
+                    >
+                      {row.outletName}
+                    </Link>
+                  </TableCell>
                   <TableCell>{row.licenseType}</TableCell>
                   <TableCell>{`${row.zone} / ${row.locality}`}</TableCell>
                   <TableCell>
@@ -174,6 +182,12 @@ export function AttentionTable({ rows }: AttentionTableProps): JSX.Element {
                     >
                       {expandedOutletId === row.outletId ? "Hide" : "View"}
                     </button>
+                    <Link
+                      href={`/dashboard/outlets/${row.outletId}`}
+                      className="ml-2 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                    >
+                      Open
+                    </Link>
                   </TableCell>
                 </TableRow>
                 <TableRow className={expandedOutletId === row.outletId ? "" : "hidden"}>
