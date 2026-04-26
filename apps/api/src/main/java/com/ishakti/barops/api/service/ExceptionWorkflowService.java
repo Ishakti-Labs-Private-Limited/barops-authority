@@ -6,6 +6,7 @@ import com.ishakti.barops.api.dto.OutletAttentionDto;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -49,6 +50,9 @@ public class ExceptionWorkflowService {
         }
 
         String nextStatus = normalizeStatus(request.status(), existing.status);
+        if (!nextStatus.equals(existing.status)) {
+            existing.lastStatusChangeAt = OffsetDateTime.now();
+        }
         existing.status = nextStatus;
         if (request.owner() != null && !request.owner().isBlank()) {
             existing.owner = request.owner();
@@ -62,6 +66,7 @@ public class ExceptionWorkflowService {
         if ("CLOSED".equals(nextStatus) && (existing.closureNote == null || existing.closureNote.isBlank())) {
             existing.closureNote = "Closed in demo workflow.";
         }
+        existing.lastUpdatedAt = OffsetDateTime.now();
 
         OutletAttentionDto outlet = attentionService.getDailyAttention().stream()
                 .filter(row -> issueId.startsWith(row.outletId()))
@@ -75,6 +80,12 @@ public class ExceptionWorkflowService {
     public int getOverdueOpenIssueCount() {
         return (int) getAllIssues().stream()
                 .filter(issue -> !"CLOSED".equals(issue.status()) && issue.overdue())
+                .count();
+    }
+
+    public int getSlaAtRiskCount() {
+        return (int) getAllIssues().stream()
+                .filter(issue -> !"CLOSED".equals(issue.status()) && issue.slaAtRisk())
                 .count();
     }
 
@@ -127,8 +138,12 @@ public class ExceptionWorkflowService {
             ExceptionState state
     ) {
         boolean overdue = false;
+        boolean slaAtRisk = false;
         if (state.dueDate != null && !state.dueDate.isBlank() && !"CLOSED".equals(state.status)) {
-            overdue = LocalDate.parse(state.dueDate).isBefore(LocalDate.now());
+            LocalDate dueDate = LocalDate.parse(state.dueDate);
+            LocalDate today = LocalDate.now();
+            overdue = dueDate.isBefore(today);
+            slaAtRisk = !overdue && !dueDate.isAfter(today.plusDays(1));
         }
         return new ExceptionIssueDto(
                 issueId,
@@ -140,7 +155,11 @@ public class ExceptionWorkflowService {
                 state.dueDate,
                 state.closureNote,
                 state.repeatCount,
-                overdue
+                overdue,
+                slaAtRisk,
+                state.lastUpdatedAt.toString(),
+                state.lastStatusChangeAt.toString(),
+                state.closureNote != null && !state.closureNote.isBlank()
         );
     }
 
@@ -161,6 +180,8 @@ public class ExceptionWorkflowService {
         private String dueDate;
         private String closureNote;
         private final int repeatCount;
+        private OffsetDateTime lastUpdatedAt;
+        private OffsetDateTime lastStatusChangeAt;
 
         private ExceptionState(String issueTitle, String status, String owner, String dueDate, String closureNote, int repeatCount) {
             this.issueTitle = issueTitle;
@@ -169,6 +190,8 @@ public class ExceptionWorkflowService {
             this.dueDate = dueDate;
             this.closureNote = closureNote;
             this.repeatCount = repeatCount;
+            this.lastUpdatedAt = OffsetDateTime.now();
+            this.lastStatusChangeAt = OffsetDateTime.now();
         }
     }
 

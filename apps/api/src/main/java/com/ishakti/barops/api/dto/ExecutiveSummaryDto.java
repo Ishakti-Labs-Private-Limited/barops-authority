@@ -13,6 +13,9 @@ public record ExecutiveSummaryDto(
         List<IssuePatternDto> repeatedIssuePatterns,
         List<ZoneRiskSummaryDto> zoneRiskSummary,
         List<TopRiskOutletDto> outletsRequiringImmediateVisit,
+        int lowConfidenceOutlets,
+        List<TopRiskOutletDto> lowConfidenceOutletList,
+        int repeatedLateOrMissingPatterns,
         List<String> managementRecommendations
 ) {
     public record TopRiskOutletDto(
@@ -22,6 +25,7 @@ public record ExecutiveSummaryDto(
             String locality,
             int riskScore,
             int anomalyCount,
+            int closeConfidenceScore,
             List<String> reasons
     ) {
     }

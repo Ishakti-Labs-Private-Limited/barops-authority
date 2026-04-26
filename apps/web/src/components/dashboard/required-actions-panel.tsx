@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { type LanguageMode, t } from "@/lib/demo-i18n";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 
@@ -19,10 +20,15 @@ type ExceptionIssue = {
   closureNote: string;
   repeatCount: number;
   overdue: boolean;
+  slaAtRisk: boolean;
+  lastUpdatedAt: string;
+  lastStatusChangeAt: string;
+  closureNoteAdded: boolean;
 };
 
 type RequiredActionsPanelProps = {
   outletId: string;
+  lang: LanguageMode;
 };
 
 function statusBadgeClass(status: IssueStatus): string {
@@ -35,7 +41,7 @@ function statusBadgeClass(status: IssueStatus): string {
   return "bg-danger text-danger-foreground border-transparent";
 }
 
-export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): JSX.Element {
+export function RequiredActionsPanel({ outletId, lang }: RequiredActionsPanelProps): JSX.Element {
   const [issues, setIssues] = useState<ExceptionIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +66,7 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
       const payload = (await response.json()) as ExceptionIssue[];
       setIssues(payload);
     } catch {
-      setError("Unable to load required actions right now.");
+      setError(t(lang, "Unable to load required actions right now.", "ಅವಶ್ಯ ಕ್ರಮಗಳನ್ನು ಈಗ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."));
       setIssues([]);
     } finally {
       setLoading(false);
@@ -95,7 +101,7 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
       const updated = (await response.json()) as ExceptionIssue;
       setIssues((prev) => prev.map((issue) => (issue.issueId === issueId ? updated : issue)));
     } catch {
-      setError("Unable to save issue update. Please retry.");
+      setError(t(lang, "Unable to save issue update. Please retry.", "ವಿಷಯ ಅಪ್ಡೇಟ್ ಉಳಿಸಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರುಪ್ರಯತ್ನಿಸಿ."));
     } finally {
       setSavingIssueId(null);
     }
@@ -104,17 +110,21 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Required actions</CardTitle>
+        <CardTitle>{t(lang, "Required actions", "ಅವಶ್ಯ ಕ್ರಮಗಳು")}</CardTitle>
         <CardDescription>
-          Demo exception-closure workflow with ownership, due dates, and closure evidence.
+          {t(
+            lang,
+            "Demo exception-closure workflow with ownership, due dates, and closure evidence.",
+            "ಉತ್ತರದಾಯಿತ್ವ, ಗಡುವು ದಿನಾಂಕ ಮತ್ತು ಕ್ಲೋಸರ್ ಟಿಪ್ಪಣಿಯೊಂದಿಗೆ ಡೆಮೋ ಎಕ್ಸೆಪ್ಶನ್ ಕ್ಲೋಸರ್ ವರ್ಕ್‌ಫ್ಲೋ."
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {loading ? <p className="text-sm text-muted-foreground">Loading required actions...</p> : null}
+        {loading ? <p className="text-sm text-muted-foreground">{t(lang, "Loading required actions...", "ಅವಶ್ಯ ಕ್ರಮಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...")}</p> : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {!loading && issues.length === 0 ? (
           <p className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-            No action items are currently available for this outlet.
+            {t(lang, "No action items are currently available for this outlet.", "ಈ ಔಟ್‌ಲೆಟ್‌ಗೆ ಈಗ ಯಾವುದೇ ಕ್ರಮ ಅಂಶಗಳಿಲ್ಲ.")}
           </p>
         ) : null}
         {issues.map((issue) => (
@@ -123,13 +133,25 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
               <p className="text-sm font-medium">{issue.issueTitle}</p>
               <div className="flex items-center gap-2">
                 <Badge className={statusBadgeClass(issue.status)}>{issue.status}</Badge>
-                {issue.overdue ? <Badge variant="destructive">Overdue</Badge> : null}
+                {issue.overdue ? <Badge variant="destructive">{t(lang, "OVERDUE", "ಗಡುವು ಮೀರಿದೆ")}</Badge> : null}
+                {issue.slaAtRisk ? (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                    {t(lang, "SLA AT RISK", "SLA ಅಪಾಯದಲ್ಲಿದೆ")}
+                  </Badge>
+                ) : null}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">Repeat count: {issue.repeatCount}</p>
+            <p className="text-xs text-muted-foreground">
+              {t(lang, "Repeat count:", "ಮರುಕಳಿಕೆ ಸಂಖ್ಯೆ:")} {issue.repeatCount}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Last updated: {new Date(issue.lastUpdatedAt).toLocaleString()} | Last status change:{" "}
+              {new Date(issue.lastStatusChangeAt).toLocaleString()} | Closure note:{" "}
+              {issue.closureNoteAdded ? "Added" : "Not added"}
+            </p>
             <div className="grid gap-2 md:grid-cols-3">
               <label className="space-y-1 text-xs">
-                <span className="text-muted-foreground">Status</span>
+                <span className="text-muted-foreground">{t(lang, "Status", "ಸ್ಥಿತಿ")}</span>
                 <select
                   value={issue.status}
                   className="w-full rounded-md border bg-background px-2 py-1 text-sm"
@@ -149,7 +171,7 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
                 </select>
               </label>
               <label className="space-y-1 text-xs">
-                <span className="text-muted-foreground">Owner</span>
+                <span className="text-muted-foreground">{t(lang, "Owner", "ಜವಾಬ್ದಾರಿ")}</span>
                 <input
                   value={issue.owner}
                   className="w-full rounded-md border bg-background px-2 py-1 text-sm"
@@ -163,7 +185,7 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
                 />
               </label>
               <label className="space-y-1 text-xs">
-                <span className="text-muted-foreground">Due date</span>
+                <span className="text-muted-foreground">{t(lang, "Due date", "ನಿಗದಿತ ದಿನಾಂಕ")}</span>
                 <input
                   type="date"
                   value={issue.dueDate}
@@ -179,11 +201,11 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
               </label>
             </div>
             <label className="block space-y-1 text-xs">
-              <span className="text-muted-foreground">Closure note</span>
+              <span className="text-muted-foreground">{t(lang, "Closure note", "ಕ್ಲೋಸರ್ ಟಿಪ್ಪಣಿ")}</span>
               <textarea
                 value={issue.closureNote}
                 className="min-h-16 w-full rounded-md border bg-background px-2 py-1 text-sm"
-                placeholder="Add closure evidence or management note"
+                placeholder={t(lang, "Add closure evidence or management note", "ಕ್ಲೋಸರ್ ಸಾಕ್ಷಿ ಅಥವಾ ನಿರ್ವಹಣಾ ಟಿಪ್ಪಣಿ ಸೇರಿಸಿ")}
                 onChange={(event) =>
                   setIssues((prev) =>
                     prev.map((item) =>
@@ -199,7 +221,9 @@ export function RequiredActionsPanel({ outletId }: RequiredActionsPanelProps): J
               disabled={savingIssueId === issue.issueId}
               onClick={() => saveIssue(issue.issueId, issue)}
             >
-              {savingIssueId === issue.issueId ? "Saving..." : "Save action update"}
+              {savingIssueId === issue.issueId
+                ? t(lang, "Saving...", "ಉಳಿಸಲಾಗುತ್ತಿದೆ...")
+                : t(lang, "Save action update", "ಕ್ರಮ ಅಪ್ಡೇಟ್ ಉಳಿಸಿ")}
             </button>
           </div>
         ))}

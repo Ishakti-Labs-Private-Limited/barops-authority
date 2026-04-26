@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { LanguageSelector } from "@/components/dashboard/language-selector";
 import { PrintSummaryButton } from "@/components/dashboard/print-summary-button";
+import { StatusStrip } from "@/components/dashboard/status-strip";
+import { GlossaryTerm } from "@/components/dashboard/glossary-term";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { helperText, parseLanguageMode, t, withLang } from "@/lib/demo-i18n";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 
@@ -13,6 +17,7 @@ type TopRiskOutlet = {
   locality: string;
   riskScore: number;
   anomalyCount: number;
+  closeConfidenceScore: number;
   reasons: string[];
 };
 
@@ -41,11 +46,15 @@ type ExecutiveSummaryPayload = {
   repeatedIssuePatterns: IssuePattern[];
   zoneRiskSummary: ZoneRiskSummary[];
   outletsRequiringImmediateVisit: TopRiskOutlet[];
+  lowConfidenceOutlets: number;
+  lowConfidenceOutletList: TopRiskOutlet[];
+  repeatedLateOrMissingPatterns: number;
   managementRecommendations: string[];
 };
 
 type ExceptionSummaryPayload = {
   overdueOpenIssues: number;
+  closureSlaAtRisk: number;
   repeatedUnresolvedOutlets: Array<{
     outletName: string;
     repeatedIssueCount: number;
@@ -65,13 +74,20 @@ function fallbackExecutiveSummary(): ExecutiveSummaryPayload {
     repeatedIssuePatterns: [],
     zoneRiskSummary: [],
     outletsRequiringImmediateVisit: [],
+    lowConfidenceOutlets: 0,
+    lowConfidenceOutletList: [],
+    repeatedLateOrMissingPatterns: 0,
     managementRecommendations: [
       "Weekly executive summary is temporarily unavailable. Verify API service health and try again."
     ]
   };
 }
 
-async function getExecutiveSummary(): Promise<ExecutiveSummaryPayload> {
+async function getExecutiveSummary(): Promise<{
+  payload: ExecutiveSummaryPayload;
+  dataSource: "Live demo" | "Demo mode";
+  apiStatus: "Online" | "Unavailable";
+}> {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
   try {
     const response = await fetch(`${baseUrl}/executive-summary/weekly`, {
@@ -80,9 +96,17 @@ async function getExecutiveSummary(): Promise<ExecutiveSummaryPayload> {
     if (!response.ok) {
       throw new Error(`API request failed with status ${response.status}`);
     }
-    return (await response.json()) as ExecutiveSummaryPayload;
+    return {
+      payload: (await response.json()) as ExecutiveSummaryPayload,
+      dataSource: "Live demo",
+      apiStatus: "Online"
+    };
   } catch {
-    return fallbackExecutiveSummary();
+    return {
+      payload: fallbackExecutiveSummary(),
+      dataSource: "Demo mode",
+      apiStatus: "Unavailable"
+    };
   }
 }
 
@@ -99,6 +123,7 @@ async function getExceptionSummary(): Promise<ExceptionSummaryPayload> {
   } catch {
     return {
       overdueOpenIssues: 0,
+      closureSlaAtRisk: 0,
       repeatedUnresolvedOutlets: []
     };
   }
@@ -124,8 +149,16 @@ function bandBadgeClass(band: "RED" | "AMBER" | "GREEN"): string {
   return "bg-emerald-100 text-emerald-700 border-emerald-300";
 }
 
-export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
-  const summary = await getExecutiveSummary();
+type ExecutiveSummaryPageProps = {
+  searchParams?: {
+    lang?: string;
+  };
+};
+
+export default async function ExecutiveSummaryPage({ searchParams }: ExecutiveSummaryPageProps): Promise<JSX.Element> {
+  const lang = parseLanguageMode(searchParams?.lang);
+  const executiveResult = await getExecutiveSummary();
+  const summary = executiveResult.payload;
   const exceptionSummary = await getExceptionSummary();
 
   return (
@@ -136,22 +169,47 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
               BarOps Authority
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight print:text-2xl">Executive Weekly Summary</h1>
+            <h1 className="text-3xl font-semibold tracking-tight print:text-2xl">
+              {t(lang, "Executive Weekly Summary", "ಕಾರ್ಯನಿರ್ವಾಹಕ ವಾರವಾರದ ಸಾರಾಂಶ")}
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Reporting period: {summary.weekStartDate} to {summary.weekEndDate}
+              {t(lang, "Reporting period:", "ವರದಿ ಅವಧಿ:")} {summary.weekStartDate} {t(lang, "to", "ರಿಂದ")}{" "}
+              {summary.weekEndDate}
             </p>
+            {helperText(lang, "ವಾರವಾರದ ಕಾರ್ಯನಿರ್ವಾಹಕ ವಿಮರ್ಶೆಗಾಗಿ ಸಂಕ್ಷಿಪ್ತ ನಿರ್ವಹಣಾ ನಿಯಂತ್ರಣ ವರದಿ.") ? (
+              <p className="text-xs text-muted-foreground">
+                {helperText(lang, "ವಾರವಾರದ ಕಾರ್ಯನಿರ್ವಾಹಕ ವಿಮರ್ಶೆಗಾಗಿ ಸಂಕ್ಷಿಪ್ತ ನಿರ್ವಹಣಾ ನಿಯಂತ್ರಣ ವರದಿ.")}
+              </p>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 print:hidden">
+            <LanguageSelector />
             <PrintSummaryButton />
             <Link
-              href="/dashboard"
+              href={withLang("/dashboard/owner-briefing", lang)}
               className="inline-flex items-center rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
             >
-              Back to dashboard
+              {t(lang, "Generate owner briefing", "ಒನರ್ ಬ್ರಿಫಿಂಗ್ ರಚಿಸಿ")}
+            </Link>
+            <Link
+              href={withLang("/dashboard", lang)}
+              className="inline-flex items-center rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
+            >
+              {t(lang, "Back to dashboard", "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ")}
             </Link>
           </div>
         </div>
       </header>
+      <StatusStrip
+        dataSource={executiveResult.dataSource}
+        lastRefreshedAt={new Date().toLocaleString()}
+        businessDate={summary.weekEndDate}
+        apiStatus={executiveResult.apiStatus}
+      />
+      <p className="text-xs text-muted-foreground">
+        <GlossaryTerm label="Weekly review summary" help="Management snapshot of weekly risk and closure discipline." />{" "}
+        | <GlossaryTerm label="SLA at risk" help="Open issue due within 24 hours and not yet closed." />
+      </p>
 
       <section className="grid gap-4 md:grid-cols-4 print:grid-cols-4 print:gap-2">
         <Card className="print:shadow-none">
@@ -181,6 +239,33 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 print:gap-2">
+        <Card className="print:break-inside-avoid print:shadow-none">
+          <CardHeader>
+            <CardTitle>Review quality and close confidence</CardTitle>
+            <CardDescription>Signals reliability of weekly close and timeliness discipline.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p>
+              Low-confidence outlets this week:{" "}
+              <span className="font-semibold text-danger">{summary.lowConfidenceOutlets}</span>
+            </p>
+            <p>
+              Repeated late-close / missing-upload patterns:{" "}
+              <span className="font-semibold">{summary.repeatedLateOrMissingPatterns}</span>
+            </p>
+            <ul className="space-y-2">
+              {summary.lowConfidenceOutletList.slice(0, 3).map((outlet) => (
+                <li key={outlet.outletId} className="rounded-md border px-3 py-2">
+                  <span className="font-medium">{outlet.outletName}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    Close confidence {outlet.closeConfidenceScore}/100
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
         <Card className="print:break-inside-avoid print:shadow-none">
           <CardHeader>
             <CardTitle>Top risky outlets this week</CardTitle>
@@ -213,6 +298,13 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
                     </TableRow>
                   );
                 })}
+                {summary.topRiskOutlets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      No outlet risk rows are available for this period.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </CardContent>
@@ -241,7 +333,7 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
         </Card>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 print:gap-2">
+      <section className="grid gap-4 md:grid-cols-3 print:gap-2">
         <Card className="print:break-inside-avoid print:shadow-none">
           <CardHeader>
             <CardTitle>Zone-wise risk summary</CardTitle>
@@ -268,6 +360,20 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
                 ))}
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+        <Card className="print:break-inside-avoid print:shadow-none">
+          <CardHeader>
+            <CardTitle>Closure SLA at risk</CardTitle>
+            <CardDescription>Open issues due within 24 hours.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold tracking-tight text-amber-600">
+              {exceptionSummary.closureSlaAtRisk}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              These issues need proactive follow-up before they become overdue.
+            </p>
           </CardContent>
         </Card>
 

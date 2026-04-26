@@ -97,6 +97,16 @@ public class AttentionService {
                 .map(this::toTopRiskOutlet)
                 .toList();
 
+        List<ExecutiveSummaryDto.TopRiskOutletDto> lowConfidenceOutlets = rows.stream()
+                .filter(row -> row.closeConfidenceScore() < 65)
+                .sorted(Comparator.comparingInt(OutletAttentionDto::closeConfidenceScore))
+                .limit(5)
+                .map(this::toTopRiskOutlet)
+                .toList();
+        int repeatedLateOrMissingPatterns = (int) rows.stream()
+                .filter(row -> row.missingUploadToday() || row.lateUploadCount7d() >= 2)
+                .count();
+
         List<String> managementRecommendations = buildManagementRecommendations(repeatedIssuePatterns, zoneRiskSummary, immediateVisitOutlets);
 
         return new ExecutiveSummaryDto(
@@ -110,6 +120,9 @@ public class AttentionService {
                 repeatedIssuePatterns,
                 zoneRiskSummary,
                 immediateVisitOutlets,
+                lowConfidenceOutlets.size(),
+                lowConfidenceOutlets,
+                repeatedLateOrMissingPatterns,
                 managementRecommendations
         );
     }
@@ -201,6 +214,20 @@ public class AttentionService {
         String trendDirection = trendDelta >= 10 ? "UP"
                 : trendDelta <= -10 ? "DOWN" : "STABLE";
         String managementSummary = buildManagementSummary(reasons, trendDirection, row.uploadsToday());
+        int closeConfidenceScore = computeCloseConfidence(row, riskScore, trendDirection);
+        boolean missingUploadToday = row.uploadsToday() == 0;
+        String uploadTimelinessStatus = missingUploadToday
+                ? "MISSING_UPLOAD"
+                : row.lateUploads7d() >= 3 ? "CHRONIC_LATE"
+                : row.lateUploads7d() >= 1 ? "LATE_TREND"
+                : "ON_TIME";
+        String complianceNote = buildComplianceNote(
+                missingUploadToday,
+                row.lateUploads7d(),
+                row.correctionUploads7d(),
+                row.unresolvedCount30d(),
+                closeConfidenceScore
+        );
 
         return new OutletAttentionDto(
                 row.outletId(),
@@ -217,7 +244,15 @@ public class AttentionService {
                 managementSummary,
                 row.anomalyCountToday(),
                 trendDirection,
-                trendDelta
+                trendDelta,
+                closeConfidenceScore,
+                missingUploadToday,
+                row.lateUploads7d(),
+                row.correctionUploads7d(),
+                row.unresolvedCount30d(),
+                uploadTimelinessStatus,
+                row.lastUploadTime() == null ? "N/A" : row.lastUploadTime().toString(),
+                complianceNote
         );
     }
 
@@ -265,8 +300,70 @@ public class AttentionService {
                 row.locality(),
                 row.riskScore(),
                 row.anomalyCount(),
+                row.closeConfidenceScore(),
                 row.reasons()
         );
+    }
+
+    private static int computeCloseConfidence(
+            AttentionRepository.AttentionMetricsRow row,
+            int riskScore,
+            String trendDirection
+    ) {
+        int confidence = 100;
+        if (row.uploadsToday() == 0) {
+            confidence -= 35;
+        }
+        confidence -= Math.min(20, row.lateUploads7d() * 4);
+        confidence -= Math.min(18, row.correctionUploads7d() * 6);
+        confidence -= Math.min(16, row.anomalyCountToday() * 4);
+        confidence -= Math.min(14, row.unresolvedCount30d() / 2);
+
+        BigDecimal stockVariance = nullSafe(row.stockVariancePercent());
+        if (stockVariance.compareTo(BigDecimal.valueOf(12)) >= 0) {
+            confidence -= 12;
+        } else if (stockVariance.compareTo(BigDecimal.valueOf(7)) >= 0) {
+            confidence -= 8;
+        } else if (stockVariance.compareTo(BigDecimal.valueOf(3)) >= 0) {
+            confidence -= 4;
+        }
+
+        if ("UP".equals(trendDirection)) {
+            confidence -= 6;
+        } else if ("DOWN".equals(trendDirection)) {
+            confidence += 3;
+        }
+
+        if ("CL9".equalsIgnoreCase(row.licenseType())) {
+            confidence -= 5;
+        } else if ("CL7".equalsIgnoreCase(row.licenseType())) {
+            confidence -= 2;
+        }
+
+        confidence -= Math.max(0, (riskScore - 70) / 5);
+        return clampScore(confidence);
+    }
+
+    private static String buildComplianceNote(
+            boolean missingUploadToday,
+            int lateUploads7d,
+            int correctionUploads7d,
+            int unresolvedCount30d,
+            int closeConfidenceScore
+    ) {
+        if (missingUploadToday) {
+            return "No upload was received for latest business date. Close confidence is reduced until data is submitted.";
+        }
+        if (closeConfidenceScore < 55) {
+            return "Multiple control signals are weak. Leadership should verify close discipline and closure evidence.";
+        }
+        if (lateUploads7d >= 2 || correctionUploads7d >= 2) {
+            return "Upload timeliness and correction activity indicate process slippage that should be reviewed this week.";
+        }
+        if (unresolvedCount30d >= 10) {
+            return "Backlog of unresolved issues may weaken reliability of current close reporting.";
+        }
+        return "Current close controls appear reasonably reliable for weekly management review.";
     }
 
     private static List<String> buildManagementRecommendations(

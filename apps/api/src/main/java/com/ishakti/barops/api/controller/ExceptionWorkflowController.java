@@ -49,6 +49,7 @@ public class ExceptionWorkflowController {
 
         return new ExceptionExecutiveSummaryDto(
                 exceptionWorkflowService.getOverdueOpenIssueCount(),
+                exceptionWorkflowService.getSlaAtRiskCount(),
                 repeated
         );
     }

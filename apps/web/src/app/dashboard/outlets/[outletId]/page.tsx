@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { CloseConfidencePanel } from "@/components/dashboard/close-confidence-panel";
+import { LanguageSelector } from "@/components/dashboard/language-selector";
 import { RequiredActionsPanel } from "@/components/dashboard/required-actions-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AttentionBoardRow } from "@/components/dashboard/attention-table";
+import { helperText, parseLanguageMode, t, withLang } from "@/lib/demo-i18n";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 
 type OutletDetailPageProps = {
   params: {
     outletId: string;
+  };
+  searchParams?: {
+    lang?: string;
   };
 };
 
@@ -28,7 +34,15 @@ function unavailableRow(outletId: string, reason: string): AttentionBoardRow {
     managementSummary: "Live outlet detail could not be loaded for this outlet.",
     anomalyCount: 0,
     trendDirection: "STABLE",
-    trendDelta: 0
+    trendDelta: 0,
+    closeConfidenceScore: 0,
+    missingUploadToday: true,
+    lateUploadCount7d: 0,
+    postCloseCorrectionCount7d: 0,
+    recentUnresolvedIssueCount: 0,
+    uploadTimelinessStatus: "MISSING_UPLOAD",
+    lastUploadTime: "N/A",
+    complianceNote: "Close confidence cannot be evaluated because live upload signals are unavailable."
   };
 }
 
@@ -105,7 +119,8 @@ function recommendedActions(row: AttentionBoardRow): string[] {
   return actions.slice(0, 4);
 }
 
-export default async function OutletDetailPage({ params }: OutletDetailPageProps): Promise<JSX.Element> {
+export default async function OutletDetailPage({ params, searchParams }: OutletDetailPageProps): Promise<JSX.Element> {
+  const lang = parseLanguageMode(searchParams?.lang);
   const row = await getOutletDetail(params.outletId);
   const safeRow =
     row ??
@@ -124,7 +139,15 @@ export default async function OutletDetailPage({ params }: OutletDetailPageProps
       managementSummary: "No detail row was returned for this outlet id.",
       anomalyCount: 0,
       trendDirection: "STABLE",
-      trendDelta: 0
+      trendDelta: 0,
+      closeConfidenceScore: 0,
+      missingUploadToday: true,
+      lateUploadCount7d: 0,
+      postCloseCorrectionCount7d: 0,
+      recentUnresolvedIssueCount: 0,
+      uploadTimelinessStatus: "MISSING_UPLOAD",
+      lastUploadTime: "N/A",
+      complianceNote: "Close confidence cannot be evaluated because outlet detail was not returned."
     } satisfies AttentionBoardRow);
 
   const actions = recommendedActions(safeRow);
@@ -133,16 +156,20 @@ export default async function OutletDetailPage({ params }: OutletDetailPageProps
     <main className="mx-auto min-h-screen max-w-7xl space-y-6 px-6 py-10">
       <header className="space-y-3">
         <Link
-          href="/dashboard"
+          href={withLang("/dashboard", lang)}
           className="inline-flex items-center rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
         >
-          Back to attention board
+          {t(lang, "Back to attention board", "ಗಮನ ಫಲಕಕ್ಕೆ ಹಿಂತಿರುಗಿ")}
         </Link>
+        <LanguageSelector />
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">{safeRow.outletName}</h1>
           <p className="text-muted-foreground">
             {safeRow.licenseType} - {safeRow.zone}, {safeRow.locality} ({safeRow.city}, {safeRow.state})
           </p>
+          {helperText(lang, "ಔಟ್‌ಲೆಟ್ ವಿವರ: ಅಪಾಯ, ಅನುಸರಣೆ, ಮತ್ತು ಅಗತ್ಯ ಕ್ರಮಗಳ ವೀಕ್ಷಣೆ.") ? (
+            <p className="text-xs text-muted-foreground">{helperText(lang, "ಔಟ್‌ಲೆಟ್ ವಿವರ: ಅಪಾಯ, ಅನುಸರಣೆ, ಮತ್ತು ಅಗತ್ಯ ಕ್ರಮಗಳ ವೀಕ್ಷಣೆ.")}</p>
+          ) : null}
         </div>
       </header>
 
@@ -245,7 +272,9 @@ export default async function OutletDetailPage({ params }: OutletDetailPageProps
         </CardContent>
       </Card>
 
-      <RequiredActionsPanel outletId={safeRow.outletId} />
+      <CloseConfidencePanel row={safeRow} lang={lang} />
+
+      <RequiredActionsPanel outletId={safeRow.outletId} lang={lang} />
     </main>
   );
 }

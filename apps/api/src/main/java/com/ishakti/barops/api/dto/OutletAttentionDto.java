@@ -17,6 +17,14 @@ public record OutletAttentionDto(
         String managementSummary,
         int anomalyCount,
         String trendDirection,
-        int trendDelta
+        int trendDelta,
+        int closeConfidenceScore,
+        boolean missingUploadToday,
+        int lateUploadCount7d,
+        int postCloseCorrectionCount7d,
+        int recentUnresolvedIssueCount,
+        String uploadTimelinessStatus,
+        String lastUploadTime,
+        String complianceNote
 ) {
 }

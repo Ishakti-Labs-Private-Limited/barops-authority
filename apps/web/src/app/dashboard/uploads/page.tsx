@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { type ChangeEvent, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { LanguageSelector } from "@/components/dashboard/language-selector";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { helperText, parseLanguageMode, t, withLang } from "@/lib/demo-i18n";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 const PREVIEW_LIMIT = 8;
@@ -132,7 +135,8 @@ function inferMapping(headers: string[], sourceType: SourceType): Record<string,
 function validateRows(
   rows: Record<string, string>[],
   sourceType: SourceType,
-  mapping: Record<string, string>
+  mapping: Record<string, string>,
+  lang: ReturnType<typeof parseLanguageMode>
 ): { validRows: number; invalidRows: number; errors: string[] } {
   const errors: string[] = [];
   let validRows = 0;
@@ -146,7 +150,9 @@ function validateRows(
       const mappedHeader = mapping[field];
       const value = mappedHeader ? row[mappedHeader] : "";
       if (!value || value.trim().length === 0) {
-        rowErrors.push(`Row ${rowNumber}: missing ${field}`);
+        rowErrors.push(
+          `${t(lang, "Row", "ಸಾಲು")} ${rowNumber}: ${t(lang, "missing", "ಕಾಣೆಯಾಗಿದೆ")} ${field}`
+        );
       }
     }
 
@@ -154,21 +160,29 @@ function validateRows(
     if (dateHeader && row[dateHeader]) {
       const asDate = new Date(row[dateHeader]);
       if (Number.isNaN(asDate.getTime())) {
-        rowErrors.push(`Row ${rowNumber}: invalid business_date`);
+        rowErrors.push(`${t(lang, "Row", "ಸಾಲು")} ${rowNumber}: ${t(lang, "invalid business_date", "ಅಮಾನ್ಯ business_date")}`);
       }
     }
 
     if (sourceType === "pos_export") {
       const revenueHeader = mapping.net_revenue;
       if (revenueHeader && row[revenueHeader] && Number.isNaN(Number(row[revenueHeader]))) {
-        rowErrors.push(`Row ${rowNumber}: net_revenue must be numeric`);
+        rowErrors.push(
+          `${t(lang, "Row", "ಸಾಲು")} ${rowNumber}: ${t(lang, "net_revenue must be numeric", "net_revenue ಸಂಖ್ಯೆ ಆಗಿರಬೇಕು")}`
+        );
       }
     }
 
     if (sourceType === "stock_count") {
       const stockHeader = mapping.reported_closing_stock;
       if (stockHeader && row[stockHeader] && Number.isNaN(Number(row[stockHeader]))) {
-        rowErrors.push(`Row ${rowNumber}: reported_closing_stock must be numeric`);
+        rowErrors.push(
+          `${t(lang, "Row", "ಸಾಲು")} ${rowNumber}: ${t(
+            lang,
+            "reported_closing_stock must be numeric",
+            "reported_closing_stock ಸಂಖ್ಯೆ ಆಗಿರಬೇಕು"
+          )}`
+        );
       }
     }
 
@@ -184,6 +198,8 @@ function validateRows(
 }
 
 export default function UploadSimulationPage(): JSX.Element {
+  const searchParams = useSearchParams();
+  const lang = parseLanguageMode(searchParams.get("lang") ?? undefined);
   const [sourceType, setSourceType] = useState<SourceType>("pos_export");
   const [fileName, setFileName] = useState<string>("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -196,8 +212,8 @@ export default function UploadSimulationPage(): JSX.Element {
   const requiredFields = REQUIRED_FIELDS_BY_SOURCE[sourceType];
 
   const validation = useMemo(
-    () => validateRows(rows, sourceType, columnMapping),
-    [rows, sourceType, columnMapping]
+    () => validateRows(rows, sourceType, columnMapping, lang),
+    [rows, sourceType, columnMapping, lang]
   );
 
   const previewRows = useMemo(() => rows.slice(0, PREVIEW_LIMIT), [rows]);
@@ -213,6 +229,15 @@ export default function UploadSimulationPage(): JSX.Element {
 
     const content = await file.text();
     const parsed = parseCsv(content);
+    if (parsed.headers.length === 0 || parsed.rows.length === 0) {
+      setSubmitError(
+        t(
+          lang,
+          "The selected CSV has no usable data rows. Please upload a file with headers and at least one row.",
+          "ಆಯ್ದ CSV ನಲ್ಲಿ ಬಳಕೆ ಮಾಡಲು ಯೋಗ್ಯ ಸಾಲುಗಳಿಲ್ಲ. ಹೆಡರ್ ಮತ್ತು ಕನಿಷ್ಠ ಒಂದು ಸಾಲು ಇರುವ ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."
+        )
+      );
+    }
     setHeaders(parsed.headers);
     setRows(parsed.rows);
     setColumnMapping(inferMapping(parsed.headers, sourceType));
@@ -241,13 +266,16 @@ export default function UploadSimulationPage(): JSX.Element {
     setResult(null);
 
     if (rows.length === 0) {
-      setSubmitError("Upload a CSV file first.");
+      setSubmitError(t(lang, "Upload a CSV file first.", "ಮೊದಲು CSV ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ."));
       return;
     }
 
     const missingMapping = requiredFields.filter((field) => !columnMapping[field]);
     if (missingMapping.length > 0) {
-      setSubmitError(`Map required columns before submit: ${missingMapping.join(", ")}`);
+      setSubmitError(
+        t(lang, "Map required columns before submit:", "ಸಲ್ಲಿಸುವ ಮೊದಲು ಅಗತ್ಯ ಕಾಲಮ್ ಮ್ಯಾಪಿಂಗ್ ಮಾಡಿ:") +
+          ` ${missingMapping.join(", ")}`
+      );
       return;
     }
 
@@ -278,7 +306,13 @@ export default function UploadSimulationPage(): JSX.Element {
       const payload = (await response.json()) as UploadSimulationResponse;
       setResult(payload);
     } catch {
-      setSubmitError("Unable to submit upload simulation right now. Please check API and retry.");
+      setSubmitError(
+        t(
+          lang,
+          "Unable to submit upload simulation right now. Please check API and retry.",
+          "ಈಗ ಅಪ್‌ಲೋಡ್ ಅನುಕರಣ ಸಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. API ಪರಿಶೀಲಿಸಿ ಮರುಪ್ರಯತ್ನಿಸಿ."
+        )
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -291,20 +325,44 @@ export default function UploadSimulationPage(): JSX.Element {
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Upload simulation</h1>
             <p className="text-sm text-muted-foreground">
-              Demo how POS exports, manual sheets, and stock counts enter BarOps Authority.
+              {t(
+                lang,
+                "Demo how POS exports, manual sheets, and stock counts enter BarOps Authority.",
+                "POS ಎಕ್ಸ್‌ಪೋರ್ಟ್, ಮಾನವೀಯ ಶೀಟ್ ಮತ್ತು ಸ್ಟಾಕ್ ಎಣಿಕೆ ಡೇಟಾ BarOps ಗೆ ಹೇಗೆ ಬರುತ್ತದೆ ಎಂಬುದನ್ನು ತೋರಿಸುತ್ತದೆ."
+              )}
             </p>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                lang,
+                "Use a sample template or your existing CSV export to preview how BarOps ingests outlet data.",
+                "ಸ್ಯಾಂಪಲ್ ಟೆಂಪ್ಲೇಟ್ ಅಥವಾ ನಿಮ್ಮ CSV ಎಕ್ಸ್‌ಪೋರ್ಟ್ ಬಳಸಿ BarOps ಡೇಟಾ ಸ್ವೀಕಾರ ಪೂರ್ವವೀಕ್ಷಣೆ ನೋಡಿ."
+              )}
+            </p>
+            {helperText(
+              lang,
+              "ಸಹಾಯಕ ಮೋಡ್‌ನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ ಪಠ್ಯದ ಕೆಳಗೆ ಕನ್ನಡ ನೆರವು ಪಠ್ಯ ಕಾಣಿಸುತ್ತದೆ."
+            ) ? (
+              <p className="text-xs text-muted-foreground">
+                {helperText(lang, "ಸಹಾಯಕ ಮೋಡ್‌ನಲ್ಲಿ ಇಂಗ್ಲಿಷ್ ಪಠ್ಯದ ಕೆಳಗೆ ಕನ್ನಡ ನೆರವು ಪಠ್ಯ ಕಾಣಿಸುತ್ತದೆ.")}
+              </p>
+            ) : null}
           </div>
+          <LanguageSelector />
           <Link
-            href="/dashboard"
+            href={withLang("/dashboard", lang)}
             className="inline-flex items-center rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
           >
-            Back to dashboard
+            {t(lang, "Back to dashboard", "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹಿಂತಿರುಗಿ")}
           </Link>
         </div>
         <div className="rounded-md border bg-muted/20 p-3">
-          <p className="text-sm font-medium">Need a ready-to-use sample file?</p>
+            <p className="text-sm font-medium">{t(lang, "Need a ready-to-use sample file?", "ತಕ್ಷಣ ಬಳಕೆಗೆ ಸ್ಯಾಂಪಲ್ ಫೈಲ್ ಬೇಕೆ?")}</p>
           <p className="text-xs text-muted-foreground">
-            Download a CSV template, fill in your data, and upload to simulate a realistic ingestion flow.
+              {t(
+                lang,
+                "Download a CSV template, fill in your data, and upload to simulate a realistic ingestion flow.",
+                "CSV ಟೆಂಪ್ಲೇಟ್ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ, ನಿಮ್ಮ ಡೇಟಾ ತುಂಬಿ, ವಾಸ್ತವಿಕ ಇಂಜೆಕ್ಷನ್ ಅನುಕರಣ ನೋಡಿ."
+              )}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {TEMPLATE_DOWNLOADS.map((template) => (
@@ -316,7 +374,7 @@ export default function UploadSimulationPage(): JSX.Element {
                   sourceType === template.sourceType ? "border-primary text-primary" : "text-muted-foreground"
                 }`}
               >
-                Download {template.label}
+                {t(lang, "Download", "ಡೌನ್‌ಲೋಡ್")} {template.label}
               </a>
             ))}
           </div>
@@ -326,7 +384,7 @@ export default function UploadSimulationPage(): JSX.Element {
       <section className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>1) Source type</CardTitle>
+            <CardTitle>{t(lang, "1) Source type", "1) ಮೂಲ ಪ್ರಕಾರ")}</CardTitle>
             <CardDescription>Select the source format being uploaded.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -346,7 +404,7 @@ export default function UploadSimulationPage(): JSX.Element {
 
         <Card>
           <CardHeader>
-            <CardTitle>2) CSV upload</CardTitle>
+            <CardTitle>{t(lang, "2) CSV upload", "2) CSV ಅಪ್‌ಲೋಡ್")}</CardTitle>
             <CardDescription>Choose a CSV export from client data.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -369,7 +427,7 @@ export default function UploadSimulationPage(): JSX.Element {
 
         <Card>
           <CardHeader>
-            <CardTitle>3) Validation snapshot</CardTitle>
+            <CardTitle>{t(lang, "3) Validation snapshot", "3) ಪರಿಶೀಲನೆ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್")}</CardTitle>
             <CardDescription>Quick trust check before submit.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -484,7 +542,9 @@ export default function UploadSimulationPage(): JSX.Element {
             disabled={isSubmitting || rows.length === 0}
             onClick={onSubmitSimulation}
           >
-            {isSubmitting ? "Submitting simulation..." : "Submit simulation"}
+            {isSubmitting
+              ? t(lang, "Submitting simulation...", "ಅನುಕರಣ ಸಲ್ಲಿಸಲಾಗುತ್ತಿದೆ...")
+              : t(lang, "Submit simulation", "ಅನುಕರಣ ಸಲ್ಲಿಸಿ")}
           </button>
           <Badge variant="secondary">Demo mode</Badge>
         </div>

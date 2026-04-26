@@ -10,6 +10,10 @@ public record ExceptionIssueDto(
         String dueDate,
         String closureNote,
         int repeatCount,
-        boolean overdue
+        boolean overdue,
+        boolean slaAtRisk,
+        String lastUpdatedAt,
+        String lastStatusChangeAt,
+        boolean closureNoteAdded
 ) {
 }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -106,6 +107,21 @@ public class AttentionRepository {
               JOIN latest_business_date l ON u.upload_date = l.business_date
               GROUP BY u.outlet_id
             ),
+            correction_uploads_7d AS (
+              SELECT u.outlet_id,
+                     COUNT(*) AS correction_uploads_7d
+              FROM uploads u
+              JOIN latest_business_date l ON u.upload_date BETWEEN l.business_date - 6 AND l.business_date
+              WHERE u.status = 'CORRECTED'
+              GROUP BY u.outlet_id
+            ),
+            latest_upload_time AS (
+              SELECT u.outlet_id,
+                     MAX(u.created_at) AS last_upload_time
+              FROM uploads u
+              JOIN latest_business_date l ON u.upload_date <= l.business_date
+              GROUP BY u.outlet_id
+            ),
             anomalies_today AS (
               SELECT a.outlet_id,
                      COUNT(*) AS anomaly_count_today
@@ -143,10 +159,12 @@ public class AttentionRepository {
                    COALESCE(sp.avg_prev7_revenue, 0) AS avg_prev7_revenue,
                    COALESCE(lu.late_uploads_7d, 0) AS late_uploads_7d,
                    COALESCE(ut.uploads_today, 0) AS uploads_today,
+                   COALESCE(cu.correction_uploads_7d, 0) AS correction_uploads_7d,
                    COALESCE(at.anomaly_count_today, 0) AS anomaly_count_today,
                    COALESCE(ur.unresolved_count_30d, 0) AS unresolved_count_30d,
                    COALESCE(r7.avg_risk_score_7d, 0) AS avg_risk_score_7d,
-                   COALESCE(r7.risk_score_latest_day, 0) AS risk_score_latest_day
+                   COALESCE(r7.risk_score_latest_day, 0) AS risk_score_latest_day,
+                   lt.last_upload_time
             FROM blr_outlets o
             CROSS JOIN latest_business_date l
             LEFT JOIN stock_latest st ON st.outlet_id = o.id
@@ -154,9 +172,11 @@ public class AttentionRepository {
             LEFT JOIN sales_prev_7d sp ON sp.outlet_id = o.id
             LEFT JOIN late_uploads_7d lu ON lu.outlet_id = o.id
             LEFT JOIN uploads_today ut ON ut.outlet_id = o.id
+            LEFT JOIN correction_uploads_7d cu ON cu.outlet_id = o.id
             LEFT JOIN anomalies_today at ON at.outlet_id = o.id
             LEFT JOIN unresolved_30d ur ON ur.outlet_id = o.id
             LEFT JOIN risk_7d r7 ON r7.outlet_id = o.id
+            LEFT JOIN latest_upload_time lt ON lt.outlet_id = o.id
             """;
 
     private static final RowMapper<AttentionMetricsRow> ROW_MAPPER = (rs, rowNum) -> new AttentionMetricsRow(
@@ -173,10 +193,12 @@ public class AttentionRepository {
             rs.getBigDecimal("avg_prev7_revenue"),
             rs.getInt("late_uploads_7d"),
             rs.getInt("uploads_today"),
+            rs.getInt("correction_uploads_7d"),
             rs.getInt("anomaly_count_today"),
             rs.getInt("unresolved_count_30d"),
             rs.getBigDecimal("avg_risk_score_7d"),
-            rs.getBigDecimal("risk_score_latest_day")
+            rs.getBigDecimal("risk_score_latest_day"),
+            rs.getObject("last_upload_time", OffsetDateTime.class)
     );
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
@@ -215,10 +237,12 @@ public class AttentionRepository {
             BigDecimal avgPrev7Revenue,
             int lateUploads7d,
             int uploadsToday,
+            int correctionUploads7d,
             int anomalyCountToday,
             int unresolvedCount30d,
             BigDecimal avgRiskScore7d,
-            BigDecimal riskScoreLatestDay
+            BigDecimal riskScoreLatestDay,
+            OffsetDateTime lastUploadTime
     ) {
     }
 }
