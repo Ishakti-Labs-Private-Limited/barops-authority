@@ -44,6 +44,15 @@ type ExecutiveSummaryPayload = {
   managementRecommendations: string[];
 };
 
+type ExceptionSummaryPayload = {
+  overdueOpenIssues: number;
+  repeatedUnresolvedOutlets: Array<{
+    outletName: string;
+    repeatedIssueCount: number;
+    unresolvedIssueCount: number;
+  }>;
+};
+
 function fallbackExecutiveSummary(): ExecutiveSummaryPayload {
   return {
     weekStartDate: "N/A",
@@ -77,6 +86,24 @@ async function getExecutiveSummary(): Promise<ExecutiveSummaryPayload> {
   }
 }
 
+async function getExceptionSummary(): Promise<ExceptionSummaryPayload> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+  try {
+    const response = await fetch(`${baseUrl}/exceptions/summary`, {
+      next: { revalidate: 60 }
+    });
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+    return (await response.json()) as ExceptionSummaryPayload;
+  } catch {
+    return {
+      overdueOpenIssues: 0,
+      repeatedUnresolvedOutlets: []
+    };
+  }
+}
+
 function bandForScore(score: number): "RED" | "AMBER" | "GREEN" {
   if (score >= 75) {
     return "RED";
@@ -99,6 +126,7 @@ function bandBadgeClass(band: "RED" | "AMBER" | "GREEN"): string {
 
 export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
   const summary = await getExecutiveSummary();
+  const exceptionSummary = await getExceptionSummary();
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl space-y-6 bg-background px-6 py-10 print:max-w-none print:bg-white print:px-2 print:py-4">
@@ -264,6 +292,45 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
               {summary.outletsRequiringImmediateVisit.length === 0 ? (
                 <li className="rounded-md border px-3 py-2 text-muted-foreground">
                   No immediate-visit outlets are currently flagged.
+                </li>
+              ) : null}
+            </ul>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 print:gap-2">
+        <Card className="print:break-inside-avoid print:shadow-none">
+          <CardHeader>
+            <CardTitle>Overdue open issues</CardTitle>
+            <CardDescription>Exceptions that have crossed target closure date.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-semibold tracking-tight text-danger">{exceptionSummary.overdueOpenIssues}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              These items should be escalated in today&apos;s management review.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="print:break-inside-avoid print:shadow-none">
+          <CardHeader>
+            <CardTitle>Repeated unresolved issues</CardTitle>
+            <CardDescription>Outlets where unresolved issues are recurring repeatedly.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2 text-sm">
+              {exceptionSummary.repeatedUnresolvedOutlets.map((item) => (
+                <li key={item.outletName} className="rounded-md border px-3 py-2">
+                  <p className="font-medium">{item.outletName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Repeated: {item.repeatedIssueCount} | Unresolved total: {item.unresolvedIssueCount}
+                  </p>
+                </li>
+              ))}
+              {exceptionSummary.repeatedUnresolvedOutlets.length === 0 ? (
+                <li className="rounded-md border px-3 py-2 text-muted-foreground">
+                  No repeated unresolved patterns are currently flagged.
                 </li>
               ) : null}
             </ul>

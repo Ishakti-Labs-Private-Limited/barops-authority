@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { RequiredActionsPanel } from "@/components/dashboard/required-actions-panel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AttentionBoardRow } from "@/components/dashboard/attention-table";
 
@@ -243,6 +244,8 @@ export default async function OutletDetailPage({ params }: OutletDetailPageProps
           </ol>
         </CardContent>
       </Card>
+
+      <RequiredActionsPanel outletId={safeRow.outletId} />
     </main>
   );
 }
