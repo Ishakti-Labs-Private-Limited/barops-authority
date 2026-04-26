@@ -56,12 +56,20 @@ export default async function DashboardPage(): Promise<JSX.Element> {
       <header className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h1 className="text-3xl font-semibold tracking-tight">Control tower</h1>
-          <Link
-            href="/dashboard/executive-summary"
-            className="rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
-          >
-            Open executive summary
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/dashboard/uploads"
+              className="rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
+            >
+              Upload simulation
+            </Link>
+            <Link
+              href="/dashboard/executive-summary"
+              className="rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"
+            >
+              Open executive summary
+            </Link>
+          </div>
         </div>
         <p className="max-w-3xl text-muted-foreground">
           BarOps Authority sits above POS feeds, Excel imports, and manual uploads. It flags which

@@ -1,0 +1,4 @@
+outlet_id,business_date,product_sku,product_name,expected_closing_stock,reported_closing_stock,variance_percent,counted_by
+60a01bdd-d319-58f7-87c2-67ef976b5af5,2026-04-20,SKU-RUM-750,Premium Dark Rum 750ml,84,74,11.9,store.supervisor@barops.in
+612eb48a-6843-5594-b6e2-7e0666bbe04b,2026-04-20,SKU-WHS-700,Reserve Whisky 700ml,96,87,9.4,stock.auditor@barops.in
+009ab462-4460-549a-8f28-eee3d29c2696,2026-04-20,SKU-GIN-750,Classic Dry Gin 750ml,72,65,9.7,outlet.manager@barops.in

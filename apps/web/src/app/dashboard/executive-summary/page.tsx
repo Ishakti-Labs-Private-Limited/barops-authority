@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PrintSummaryButton } from "@/components/dashboard/print-summary-button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -112,7 +113,8 @@ export default async function ExecutiveSummaryPage(): Promise<JSX.Element> {
               Reporting period: {summary.weekStartDate} to {summary.weekEndDate}
             </p>
           </div>
-          <div className="print:hidden">
+          <div className="flex items-center gap-2 print:hidden">
+            <PrintSummaryButton />
             <Link
               href="/dashboard"
               className="inline-flex items-center rounded-md border px-3 py-1 text-sm text-muted-foreground hover:bg-muted"

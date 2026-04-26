@@ -1,0 +1,4 @@
+outlet_id,business_date,license_type,zone,locality,uploaded_by,notes
+60a01bdd-d319-58f7-87c2-67ef976b5af5,2026-04-20,CL7,Central,Church Street,regional.manager@barops.in,Late upload due to local network outage
+2ec60c0b-c2d9-57f2-be44-6db9f58276db,2026-04-20,CL9,North,RT Nagar,ops.supervisor@barops.in,Manual correction applied for closing variance
+79504c34-09eb-50f6-ab27-54f286c9600f,2026-04-20,CL7,Central,Church Street,area.lead@barops.in,Awaiting manager approval for correction chain
